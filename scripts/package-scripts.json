@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "db:setup": "chmod +x scripts/setup-database.sh && ./scripts/setup-database.sh",
+    "db:seed": "tsx lib/database/seed.ts",
+    "db:reset": "npm run db:generate && npm run db:migrate && npm run db:seed",
+    "type-check": "tsc --noEmit",
+    "lint:fix": "next lint --fix",
+    "format": "prettier --write .",
+    "analyze": "ANALYZE=true npm run build",
+    "test:e2e": "playwright test",
+    "test:unit": "jest",
+    "dev:db": "npm run db:studio",
+    "build:check": "npm run type-check && npm run lint && npm run build"
+  }
+}
