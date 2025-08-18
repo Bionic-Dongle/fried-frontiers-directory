@@ -8,16 +8,42 @@ import { BlogSection } from "@/components/blog-section"
 import { StatsSection } from "@/components/stats-section"
 import { Footer } from "@/components/footer"
 import { ThemeProvider } from "@/components/theme-provider"
-import { sampleConfig, sampleBusinesses, sampleBlogPosts, directoryStats } from "@/data/sample-data"
-import { useEffect } from "react"
+import { sampleConfig, sampleBlogPosts, directoryStats } from "@/data/sample-data"
+import { apiClient } from "@/src/lib/wordpress-api"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
 export default function HomePage() {
   const router = useRouter()
+  const [featuredBusinesses, setFeaturedBusinesses] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    console.log("STUB: Page view analytics")
+    
+    const loadFeaturedBusinesses = async () => {
+      try {
+        setLoading(true)
+        const businesses = await apiClient.getFeaturedBusinesses(6)
+        setFeaturedBusinesses(businesses)
+      } catch (err) {
+        console.error('Error loading featured businesses:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load businesses')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadFeaturedBusinesses()
+  }, [])
 
   // STUB: All these handlers will be replaced with real functionality
   const handleSearch = (query: string, location?: string) => {
-    console.log("STUB: Search executed - Query:", query, "Location:", location)
+    const searchParams = new URLSearchParams()
+    if (query) searchParams.set('q', query)
+    if (location) searchParams.set('location', location)
+    router.push(`/businesses?${searchParams.toString()}`)
   }
 
   const handleCategoryClick = (categoryId: string) => {
@@ -35,7 +61,7 @@ export default function HomePage() {
   }
 
   const handleBusinessView = (businessId: string) => {
-    console.log("STUB: Business viewed:", businessId)
+    router.push(`/business/${businessId}`)
   }
 
   const handleLogin = () => {
@@ -48,7 +74,7 @@ export default function HomePage() {
   }
 
   const handleViewAllBusinesses = () => {
-    console.log("STUB: View all businesses clicked")
+    router.push('/businesses')
   }
 
   const handleSocialClick = (platform: string) => {
@@ -99,13 +125,24 @@ export default function HomePage() {
         />
 
         {/* Featured Businesses */}
-        <FeaturedBusinesses
-          businesses={sampleBusinesses}
-          onSave={handleBusinessSave}
-          onShare={handleBusinessShare}
-          onView={handleBusinessView}
-          config={{ maxBusinesses: 8, variant: "grid" }}
-        />
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading featured businesses...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-red-600">Error loading businesses: {error}</p>
+          </div>
+        ) : (
+          <FeaturedBusinesses
+            businesses={featuredBusinesses}
+            onSave={handleBusinessSave}
+            onShare={handleBusinessShare}
+            onView={handleBusinessView}
+            config={{ maxBusinesses: 8, variant: "grid" }}
+          />
+        )}
 
         {/* Blog Section - Conditional Premium Feature */}
         <BlogSection
@@ -122,7 +159,7 @@ export default function HomePage() {
         <Footer
           config={{
             siteName: sampleConfig.siteName,
-            categories: sampleConfig.categories.slice(0, 4),
+            categories: sampleConfig.categories?.slice(0, 4),
           }}
           onCategoryClick={handleCategoryClick}
           onSocialClick={handleSocialClick}

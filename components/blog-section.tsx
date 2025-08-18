@@ -4,11 +4,25 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Clock, User, ArrowRight, ImageIcon } from "lucide-react"
-import type { BlogSectionProps, BlogPost } from "@/types/directory"
+import type { BlogPost } from "@/types/directory"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 
-export function BlogSection({ config, posts = [], onReadPost, onViewAllPosts }: BlogSectionProps) {
+interface BlogSectionProps {
+  config?: {
+    siteName?: string
+    features?: {
+      blogSection?: boolean
+      blogTitle?: string
+      blogSubtitle?: string
+    }
+  }
+  posts: BlogPost[]
+  onReadPost?: (postId: string) => void
+  onViewAllPosts?: () => void
+}
+
+export function BlogSection({ config = {}, posts = [], onReadPost, onViewAllPosts }: BlogSectionProps) {
   const router = useRouter()
   const [imageLoadingStates, setImageLoadingStates] = useState<Record<string, boolean>>({})
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({})
@@ -44,7 +58,7 @@ export function BlogSection({ config, posts = [], onReadPost, onViewAllPosts }: 
   // Show up to 3 posts, with first post as featured if it has the featured flag
   const displayedPosts = posts.slice(0, 3).map((post, index) => ({
     ...post,
-    featured: index === 0, // First post is always featured in display
+    isFeatured: index === 0, // First post is always featured in display
   }))
 
   // Generate placeholder URL with category-specific styling
@@ -69,7 +83,7 @@ export function BlogSection({ config, posts = [], onReadPost, onViewAllPosts }: 
   const getImageSrc = (post: BlogPost, index: number) => {
     // If we should use placeholder or image is missing/empty
     if (usePlaceholder[post.id] || !post.featuredImage || post.featuredImage.trim() === "") {
-      const isFeatured = index === 0 && post.featured
+      const isFeatured = index === 0 && post.isFeatured
       const width = isFeatured ? 600 : 400
       const height = isFeatured ? 400 : 300
       const text = post.category
@@ -138,15 +152,15 @@ export function BlogSection({ config, posts = [], onReadPost, onViewAllPosts }: 
             <article
               key={post.id}
               className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden group cursor-pointer border border-gray-200 dark:border-gray-700 ${
-                post.featured ? "ring-2 ring-yellow-500 ring-opacity-50" : ""
+                post.isFeatured ? "ring-2 ring-yellow-500 ring-opacity-50" : ""
               }`}
               onClick={() => handleReadPost(post.id, post.slug)}
             >
-              <div className={`flex flex-col ${index === 0 && post.featured ? "lg:flex-row" : "md:flex-row"} gap-0`}>
+              <div className={`flex flex-col ${index === 0 && post.isFeatured ? "lg:flex-row" : "md:flex-row"} gap-0`}>
                 {/* Image Container */}
-                <div className={`relative overflow-hidden ${index === 0 && post.featured ? "lg:w-1/2" : "md:w-2/5"}`}>
+                <div className={`relative overflow-hidden ${index === 0 && post.isFeatured ? "lg:w-1/2" : "md:w-2/5"}`}>
                   <div
-                    className={`relative ${index === 0 && post.featured ? "h-64 lg:h-full min-h-[300px]" : "h-48 md:h-full min-h-[200px]"}`}
+                    className={`relative ${index === 0 && post.isFeatured ? "h-64 lg:h-full min-h-[300px]" : "h-48 md:h-full min-h-[200px]"}`}
                   >
                     {/* Loading State */}
                     {imageLoadingStates[post.id] && (
@@ -175,7 +189,7 @@ export function BlogSection({ config, posts = [], onReadPost, onViewAllPosts }: 
                       }`}
                       priority={index === 0}
                       sizes={
-                        index === 0 && post.featured
+                        index === 0 && post.isFeatured
                           ? "(max-width: 768px) 100vw, (max-width: 1024px) 100vw, 50vw"
                           : "(max-width: 768px) 100vw, (max-width: 1024px) 40vw, 40vw"
                       }
@@ -194,7 +208,7 @@ export function BlogSection({ config, posts = [], onReadPost, onViewAllPosts }: 
                     </div>
 
                     {/* Featured Badge */}
-                    {post.featured && (
+                    {post.isFeatured && (
                       <div className="absolute top-4 right-4">
                         <Badge className="bg-yellow-500 dark:bg-yellow-600 text-gray-900 dark:text-gray-100 font-semibold">
                           Featured
@@ -214,7 +228,7 @@ export function BlogSection({ config, posts = [], onReadPost, onViewAllPosts }: 
                 </div>
 
                 {/* Content Container */}
-                <div className={`flex-1 p-6 ${index === 0 && post.featured ? "lg:p-8" : "md:p-6"}`}>
+                <div className={`flex-1 p-6 ${index === 0 && post.isFeatured ? "lg:p-8" : "md:p-6"}`}>
                   {/* Category Badge - Mobile */}
                   <div className="md:hidden mb-3">
                     <Badge variant="secondary" className="text-sm">
@@ -225,7 +239,7 @@ export function BlogSection({ config, posts = [], onReadPost, onViewAllPosts }: 
                   {/* Title */}
                   <h3
                     className={`font-bold text-gray-900 dark:text-gray-100 mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 ${
-                      index === 0 && post.featured ? "text-2xl lg:text-3xl" : "text-xl"
+                      index === 0 && post.isFeatured ? "text-2xl lg:text-3xl" : "text-xl"
                     }`}
                   >
                     {post.title}
@@ -234,7 +248,7 @@ export function BlogSection({ config, posts = [], onReadPost, onViewAllPosts }: 
                   {/* Excerpt */}
                   <p
                     className={`text-gray-600 dark:text-gray-300 mb-4 leading-relaxed ${
-                      index === 0 && post.featured ? "text-lg line-clamp-3" : "line-clamp-2"
+                      index === 0 && post.isFeatured ? "text-lg line-clamp-3" : "line-clamp-2"
                     }`}
                   >
                     {post.excerpt}

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, ArrowUp } from "lucide-react"
 import { scrollToTop } from "@/utils/scroll-utils"
+import type { Category } from "@/types/directory"
 
 const categories = [
   { name: "Fine Dining", href: "/businesses?category=fine-dining" },
@@ -14,7 +15,16 @@ const categories = [
   { name: "Bars & Pubs", href: "/businesses?category=bars-pubs" },
 ]
 
-export function Footer() {
+interface FooterProps {
+  config?: {
+    siteName: string
+    categories?: Category[]
+  }
+  onCategoryClick?: (categoryId: string) => void
+  onSocialClick?: (platform: string) => void
+}
+
+export function Footer({ config, onCategoryClick, onSocialClick }: FooterProps = {}) {
   const [showScrollTop, setShowScrollTop] = useState(false)
 
   useEffect(() => {
@@ -43,9 +53,9 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Melbourne Food Directory</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{config?.siteName || "Fried Frontiers"}</h3>
             <p className="text-gray-600 dark:text-gray-400 text-sm">
-              Discover the best restaurants, cafes, and dining experiences in Melbourne. Your guide to exceptional food
+              Discover the best fish & chip shops and crispy fry spots in Yarra Valley. Your guide to exceptional food
               and memorable meals.
             </p>
             <div className="flex space-x-4">
@@ -121,15 +131,26 @@ export function Footer() {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Categories</h3>
             <div className="grid grid-cols-2 gap-2">
-              {categories.map((category) => (
-                <button
-                  key={category.name}
-                  onClick={() => handleCategoryClick(category.href)}
-                  className="text-left text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300 text-sm px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
-                >
-                  {category.name}
-                </button>
-              ))}
+              {(config?.categories || categories).map((category) => {
+                const categoryId = 'id' in category ? category.id : category.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                const categoryHref = 'href' in category ? category.href : `/businesses?category=${categoryId}`
+                
+                return (
+                  <button
+                    key={category.name}
+                    onClick={() => {
+                      if (onCategoryClick) {
+                        onCategoryClick(categoryId)
+                      } else {
+                        handleCategoryClick(categoryHref)
+                      }
+                    }}
+                    className="text-left text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300 text-sm px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
+                  >
+                    {category.name}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -139,7 +160,7 @@ export function Footer() {
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <MapPin className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-600 dark:text-gray-400 text-sm">Melbourne, Victoria, Australia</span>
+                <span className="text-gray-600 dark:text-gray-400 text-sm">Yarra Valley, Victoria, Australia</span>
               </div>
               <div className="flex items-center space-x-3">
                 <Phone className="h-4 w-4 text-gray-400" />
@@ -147,7 +168,7 @@ export function Footer() {
               </div>
               <div className="flex items-center space-x-3">
                 <Mail className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-600 dark:text-gray-400 text-sm">hello@melbournefood.com</span>
+                <span className="text-gray-600 dark:text-gray-400 text-sm">hello@friedfrontiers.com</span>
               </div>
             </div>
           </div>
@@ -157,7 +178,7 @@ export function Footer() {
         <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-600 dark:text-gray-400 text-sm">
-              © 2024 Melbourne Food Directory. All rights reserved.
+              © 2024 {config?.siteName || "Fried Frontiers"}. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <Link
