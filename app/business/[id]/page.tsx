@@ -10,7 +10,8 @@ import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { InteractiveMap } from "@/components/interactive-map"
 import { ThemeProvider } from "@/components/theme-provider"
-import { sampleConfig, sampleBusinesses } from "@/data/sample-data"
+import { sampleConfig } from "@/data/sample-data"
+import { apiClient } from "@/src/lib/wordpress-api"
 import {
   Star,
   MapPin,
@@ -32,18 +33,52 @@ export default function BusinessDetailPage() {
   const params = useParams()
   const businessId = params.id as string
 
-  // STUB: Find business by ID (will be replaced with real data fetching)
-  const business = sampleBusinesses.find((b) => b.id === businessId)
-
+  const [business, setBusiness] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isSaved, setIsSaved] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
 
-  // Add scroll to top when page loads
+  // Load business data and scroll to top when page loads
   useEffect(() => {
     window.scrollTo(0, 0)
+    
+    const loadBusiness = async () => {
+      try {
+        setLoading(true)
+        const businessData = await apiClient.getBusinessById(businessId)
+        setBusiness(businessData)
+        
+        if (!businessData) {
+          setError('Business not found')
+        }
+      } catch (err) {
+        console.error('Error loading business:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load business')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadBusiness()
   }, [businessId])
 
-  if (!business) {
+  if (loading) {
+    return (
+      <ThemeProvider>
+        <div className="min-h-screen bg-background transition-colors duration-300">
+          <Navigation config={{ siteName: sampleConfig.siteName }} />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading business details...</p>
+          </div>
+          <Footer config={{ siteName: sampleConfig.siteName, categories: sampleConfig.categories?.slice(0, 4) }} />
+        </div>
+      </ThemeProvider>
+    )
+  }
+
+  if (error || !business) {
     return (
       <ThemeProvider>
         <div className="min-h-screen bg-background transition-colors duration-300">
@@ -53,13 +88,13 @@ export default function BusinessDetailPage() {
               Business Not Found
             </h1>
             <p className="text-muted-foreground mb-8 transition-colors duration-300">
-              The business you're looking for doesn't exist.
+              {error || "The business you're looking for doesn't exist."}
             </p>
             <Link href="/">
               <Button>Return Home</Button>
             </Link>
           </div>
-          <Footer config={{ siteName: sampleConfig.siteName, categories: sampleConfig.categories.slice(0, 4) }} />
+          <Footer config={{ siteName: sampleConfig.siteName, categories: sampleConfig.categories?.slice(0, 4) }} />
         </div>
       </ThemeProvider>
     )

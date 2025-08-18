@@ -4,7 +4,7 @@ export interface DirectoryConfig {
   niche: string
   siteName: string
   categories: Category[]
-  customFields: CustomField[]
+  customFields?: CustomField[]
   features?: {
     blogSection?: boolean // Toggle blog section on/off
     blogTitle?: string // Default: "Featured Stories"

@@ -10,7 +10,8 @@ import { BusinessCard } from "@/components/business-card"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { ThemeProvider } from "@/components/theme-provider"
-import { sampleConfig, sampleBusinesses } from "@/data/sample-data"
+import { sampleConfig } from "@/data/sample-data"
+import { apiClient } from "@/src/lib/wordpress-api"
 import { Grid, List, Filter, SlidersHorizontal, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
@@ -23,15 +24,41 @@ export default function BusinessesPage() {
   const [sortBy, setSortBy] = useState("rating")
   const [showFilters, setShowFilters] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [businesses, setBusinesses] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [activeFilters, setActiveFilters] = useState({
     categories: categoryParam ? [categoryParam] : [],
     rating: 0,
-    priceRanges: [],
+    priceRanges: [] as string[],
     radius: 10,
   })
 
-  // Update active filters when category parameter changes
+  // Load businesses and update active filters when category parameter changes
   useEffect(() => {
+    const loadBusinesses = async () => {
+      try {
+        setLoading(true)
+        let businessData
+        
+        const searchQuery = searchParams.get("q")
+        if (searchQuery) {
+          businessData = await apiClient.searchBusinesses({ q: searchQuery, limit: 50 })
+        } else {
+          businessData = await apiClient.getBusinesses({ limit: 50 })
+        }
+        
+        setBusinesses(businessData)
+      } catch (err) {
+        console.error('Error loading businesses:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load businesses')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadBusinesses()
+    
     if (categoryParam) {
       setIsLoading(true)
       setActiveFilters((prevFilters) => ({
@@ -39,16 +66,17 @@ export default function BusinessesPage() {
         categories: [categoryParam],
       }))
 
-      // Simulate loading time for better UX
       setTimeout(() => setIsLoading(false), 500)
     } else {
       setIsLoading(false)
     }
-  }, [categoryParam])
+  }, [categoryParam, searchParams])
 
   // STUB: All these handlers will be replaced with real functionality
   const handleSearch = (query: string) => {
-    console.log("STUB: Search businesses:", query)
+    const searchParams = new URLSearchParams(window.location.search)
+    searchParams.set('q', query)
+    window.location.search = searchParams.toString()
   }
 
   const handleLocationSearch = (location: string) => {
@@ -133,11 +161,11 @@ export default function BusinessesPage() {
   }
 
   const handleBusinessView = (businessId: string) => {
-    console.log("STUB: View business:", businessId)
+    window.location.href = `/business/${businessId}`
   }
 
-  // STUB: Filter businesses based on active filters
-  let filteredBusinesses = [...sampleBusinesses] // Create a copy to avoid mutations
+  // Filter businesses based on active filters
+  let filteredBusinesses = [...businesses] // Create a copy to avoid mutations
 
   // Filter by category if specified
   if (activeFilters.categories.length > 0) {
@@ -199,7 +227,7 @@ export default function BusinessesPage() {
                     {selectedCategoryName} Businesses
                   </h1>
                   <p className="text-muted-foreground transition-colors duration-300">
-                    Discover {filteredBusinesses.length} amazing {selectedCategoryName.toLowerCase()} businesses in your
+                    Discover {filteredBusinesses.length} amazing {selectedCategoryName?.toLowerCase()} businesses in your
                     area
                   </p>
                 </div>
@@ -236,7 +264,7 @@ export default function BusinessesPage() {
           </div>
 
           {/* Loading State */}
-          {isLoading && (
+          {(isLoading || loading) && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -245,7 +273,13 @@ export default function BusinessesPage() {
             </div>
           )}
 
-          {!isLoading && (
+          {error && (
+            <div className="text-center py-12">
+              <p className="text-red-600">Error loading businesses: {error}</p>
+            </div>
+          )}
+
+          {!isLoading && !loading && !error && (
             <div className="flex flex-col lg:flex-row gap-8">
               {/* Sidebar - Desktop */}
               <div className="hidden lg:block w-80 flex-shrink-0">
@@ -273,10 +307,9 @@ export default function BusinessesPage() {
                   >
                     <Filter className="h-4 w-4 mr-2" />
                     Filters & Search
-                    {activeFilters.categories.length +
+                    {(activeFilters.categories.length +
                       activeFilters.priceRanges.length +
-                      (activeFilters.rating > 0 ? 1 : 0) >
-                      0 && (
+                      (activeFilters.rating > 0 ? 1 : 0)) > 0 && (
                       <Badge className="ml-2" variant="secondary">
                         {activeFilters.categories.length +
                           activeFilters.priceRanges.length +
@@ -412,7 +445,7 @@ export default function BusinessesPage() {
         <Footer
           config={{
             siteName: sampleConfig.siteName,
-            categories: sampleConfig.categories.slice(0, 4),
+            categories: sampleConfig.categories?.slice(0, 4),
           }}
         />
       </div>

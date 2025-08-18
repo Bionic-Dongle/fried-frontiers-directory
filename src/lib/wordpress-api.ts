@@ -1,7 +1,7 @@
 // WordPress REST API Client with Mock Data Fallback
 // This ensures the site works with or without WordPress backend
 
-const WORDPRESS_API_URL = import.meta.env.VITE_WORDPRESS_API_URL || 'http://localhost/wp-json'
+const WORDPRESS_API_URL = process.env.NEXT_PUBLIC_WORDPRESS_API_URL || 'https://friedfrontiers.peakinspire.com/wp-json'
 
 // Mock data that matches the existing site structure
 const MOCK_CATEGORIES = [
@@ -109,22 +109,51 @@ function transformWordPressBusiness(wpPost: any) {
   return {
     id: wpPost.id.toString(),
     name: wpPost.title.rendered,
-    category_id: wpPost.categories[0]?.toString() || '1',
+    slug: wpPost.slug || wpPost.title.rendered.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    category: wpPost.acf?.category || 'Fish & Chips',
+    categoryId: wpPost.categories[0]?.toString() || '1',
+    rating: parseFloat(wpPost.acf?.rating || '4.0'),
+    reviewCount: parseInt(wpPost.acf?.review_count || '0'),
     address: wpPost.acf?.address || '',
+    coordinates: {
+      lat: parseFloat(wpPost.acf?.latitude || '-37.7749'),
+      lng: parseFloat(wpPost.acf?.longitude || '145.3716')
+    },
+    priceRange: wpPost.acf?.price_range || '$$',
+    imageUrl: wpPost.featured_media_url || wpPost.acf?.image_url || '/images/fish-chips-hero.png',
+    images: wpPost.acf?.photos || [wpPost.featured_media_url || '/images/fish-chips-hero.png'],
     phone: wpPost.acf?.phone || '',
-    website: wpPost.acf?.website || '',
     email: wpPost.acf?.email || '',
+    website: wpPost.acf?.website || '',
     description: wpPost.content.rendered.replace(/<[^>]*>/g, ''),
-    latitude: wpPost.acf?.latitude || 0,
-    longitude: wpPost.acf?.longitude || 0,
-    rating: wpPost.acf?.rating || 0,
-    review_count: wpPost.acf?.review_count || 0,
-    hours: wpPost.acf?.hours || {},
-    photos: wpPost.acf?.photos || [],
-    status: wpPost.status === 'publish' ? 'active' : 'pending',
-    featured: wpPost.acf?.featured || false,
-    created_at: wpPost.date,
-    updated_at: wpPost.modified
+    shortDescription: wpPost.excerpt?.rendered?.replace(/<[^>]*>/g, '') || wpPost.acf?.short_description || '',
+    isActive: wpPost.status === 'publish',
+    isFeatured: wpPost.acf?.featured || false,
+    isVerified: wpPost.acf?.verified || false,
+    isPremium: wpPost.acf?.premium || false,
+    dateAdded: wpPost.date,
+    lastUpdated: wpPost.modified,
+    viewCount: parseInt(wpPost.acf?.view_count || '0'),
+    businessHours: wpPost.acf?.hours || {
+      monday: '9:00 AM - 9:00 PM',
+      tuesday: '9:00 AM - 9:00 PM',
+      wednesday: '9:00 AM - 9:00 PM',
+      thursday: '9:00 AM - 9:00 PM',
+      friday: '9:00 AM - 10:00 PM',
+      saturday: '8:00 AM - 10:00 PM',
+      sunday: '8:00 AM - 8:00 PM'
+    },
+    socialMedia: {
+      facebook: wpPost.acf?.facebook || '',
+      instagram: wpPost.acf?.instagram || '',
+      twitter: wpPost.acf?.twitter || ''
+    },
+    customFields: {
+      cuisineType: wpPost.acf?.cuisine_type || 'Fish & Chips',
+      averageMealPrice: parseInt(wpPost.acf?.average_meal_price || '25'),
+      bookingRequired: wpPost.acf?.booking_required || false,
+      dietaryOptions: wpPost.acf?.dietary_options || ['Vegetarian', 'Gluten-Free']
+    }
   }
 }
 
@@ -147,7 +176,12 @@ export const apiClient = {
   // Get categories (WordPress or mock)
   async getCategories() {
     try {
-      const response = await fetch(`${WORDPRESS_API_URL}/wp/v2/categories?per_page=100`)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+      
+      const response = await fetch(`${WORDPRESS_API_URL}/wp/v2/categories?per_page=100`, { signal: controller.signal })
+      clearTimeout(timeoutId)
+      
       if (!response.ok) throw new Error('WordPress API unavailable')
       const wpCategories = await response.json()
       console.log('✅ Using WordPress categories')
@@ -173,35 +207,107 @@ export const apiClient = {
       if (filters.status === 'active') params.append('status', 'publish')
       if (filters.limit) params.append('per_page', filters.limit.toString())
       
-      const response = await fetch(`${WORDPRESS_API_URL}/wp/v2/businesses?${params}`)
-      if (!response.ok) throw new Error('WordPress API unavailable')
-      const wpBusinesses = await response.json()
+      const endpoints = [
+        `${WORDPRESS_API_URL}/wp/v2/businesses?${params}`,
+        `${WORDPRESS_API_URL}/wp/v2/business?${params}`,
+        `${WORDPRESS_API_URL}/wp/v2/posts?${params}&categories=business`,
+        `${WORDPRESS_API_URL}/wp/v2/posts?${params}`
+      ]
       
-      console.log('✅ Using WordPress businesses')
-      let businesses = wpBusinesses.map(transformWordPressBusiness)
-      
-      if (filters.featured !== undefined) {
-        businesses = businesses.filter((b: any) => b.featured === filters.featured)
+      for (const endpoint of endpoints) {
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+          
+          const response = await fetch(endpoint, { signal: controller.signal })
+          clearTimeout(timeoutId)
+          
+          if (response.ok) {
+            const wpBusinesses = await response.json()
+            if (Array.isArray(wpBusinesses) && wpBusinesses.length > 0) {
+              console.log('✅ Using WordPress businesses from:', endpoint)
+              let businesses = wpBusinesses.map(transformWordPressBusiness)
+              
+              if (filters.featured !== undefined) {
+                businesses = businesses.filter((b: any) => b.isFeatured === filters.featured)
+              }
+              
+              return businesses
+            }
+          }
+        } catch (endpointError) {
+          console.log(`Failed endpoint ${endpoint}:`, endpointError)
+          continue
+        }
       }
       
-      return businesses
+      throw new Error('All WordPress endpoints failed')
     } catch (error) {
       console.log('📦 Using mock businesses (WordPress unavailable)')
-      let businesses = [...MOCK_BUSINESSES]
+      let businesses = MOCK_BUSINESSES.map(mockBusiness => ({
+        id: mockBusiness.id,
+        name: mockBusiness.name,
+        slug: mockBusiness.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        category: 'Fish & Chips',
+        categoryId: mockBusiness.category_id,
+        rating: mockBusiness.rating,
+        reviewCount: mockBusiness.review_count,
+        address: mockBusiness.address,
+        coordinates: { lat: mockBusiness.latitude, lng: mockBusiness.longitude },
+        priceRange: '$$',
+        imageUrl: mockBusiness.photos[0] || '/images/fish-chips-hero.png',
+        images: mockBusiness.photos,
+        phone: mockBusiness.phone,
+        email: mockBusiness.email,
+        website: mockBusiness.website,
+        description: mockBusiness.description,
+        shortDescription: mockBusiness.description.substring(0, 100) + '...',
+        isActive: mockBusiness.status === 'active',
+        isFeatured: mockBusiness.featured,
+        isVerified: true,
+        isPremium: false,
+        dateAdded: mockBusiness.created_at,
+        lastUpdated: mockBusiness.updated_at,
+        viewCount: 0,
+        businessHours: mockBusiness.hours,
+        socialMedia: {},
+        customFields: {
+          cuisineType: 'Fish & Chips',
+          averageMealPrice: 25,
+          bookingRequired: false,
+          dietaryOptions: ['Vegetarian', 'Gluten-Free']
+        }
+      }))
       
       // Apply filters to mock data
       if (filters.category) {
-        businesses = businesses.filter(b => b.category_id === filters.category)
+        businesses = businesses.filter(b => b.categoryId === filters.category)
       }
-      if (filters.status) {
-        businesses = businesses.filter(b => b.status === filters.status)
+      if (filters.status === 'active') {
+        businesses = businesses.filter(b => b.isActive)
       }
       if (filters.featured !== undefined) {
-        businesses = businesses.filter(b => b.featured === filters.featured)
+        businesses = businesses.filter(b => b.isFeatured === filters.featured)
       }
       
       return businesses
     }
+  },
+
+  // Get featured businesses
+  async getFeaturedBusinesses(limit: number = 10) {
+    return this.getBusinesses({ featured: true, limit })
+  },
+
+  // Get business by ID
+  async getBusinessById(id: string) {
+    const businesses = await this.getBusinesses()
+    return businesses.find(business => business.id === id) || null
+  },
+
+  // Get businesses by category
+  async getBusinessesByCategory(categoryId: string) {
+    return this.getBusinesses({ category: categoryId })
   },
 
   // Search businesses (WordPress or mock)
@@ -212,7 +318,12 @@ export const apiClient = {
       if (params.category) searchParams.append('categories', params.category)
       if (params.limit) searchParams.append('per_page', params.limit.toString())
 
-      const response = await fetch(`${WORDPRESS_API_URL}/wp/v2/businesses?${searchParams}`)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+      
+      const response = await fetch(`${WORDPRESS_API_URL}/wp/v2/businesses?${searchParams}`, { signal: controller.signal })
+      clearTimeout(timeoutId)
+      
       if (!response.ok) throw new Error('WordPress API unavailable')
       const wpBusinesses = await response.json()
       
@@ -240,11 +351,15 @@ export const apiClient = {
   // Submit new business (WordPress or mock)
   async submitBusiness(business: any) {
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout for POST
+      
       const response = await fetch(`${WORDPRESS_API_URL}/wp/v2/businesses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: controller.signal,
         body: JSON.stringify({
           title: business.name,
           content: business.description,
@@ -263,6 +378,8 @@ export const apiClient = {
         }),
       })
       
+      clearTimeout(timeoutId)
+      
       if (!response.ok) throw new Error('WordPress submission failed')
       console.log('✅ Business submitted to WordPress')
       return await response.json()
@@ -275,3 +392,8 @@ export const apiClient = {
 
 // Export mock data for development/testing
 export { MOCK_BUSINESSES, MOCK_CATEGORIES }
+
+// Export individual functions for easier importing
+export const { getBusinesses, getFeaturedBusinesses, getBusinessById, getBusinessesByCategory, getCategories, searchBusinesses, submitBusiness } = apiClient
+
+export default apiClient

@@ -3,6 +3,7 @@
 // Custom hooks for API integration with comprehensive error handling
 
 import { useState, useEffect, useCallback } from "react"
+import { apiClient } from "@/src/lib/wordpress-api"
 import { apiStubs } from "@/lib/api-stubs"
 import type { Business, Review, ApiResponse, BusinessSearchParams } from "@/types/directory"
 
@@ -40,45 +41,60 @@ export function useApi<T>(apiFunction: () => Promise<ApiResponse<T>>, dependenci
 
 // Business-specific hooks
 export function useBusinesses(params: BusinessSearchParams = {}) {
-  console.log("STUB: useBusinesses hook called with params:", params)
-  console.log("CURSOR TODO: Implement real-time business data fetching")
+  console.log("useBusinesses hook called with params:", params)
 
-  return useApi(() => apiStubs.searchBusinesses(params), [JSON.stringify(params)])
+  return useApi(async () => {
+    const businesses = await apiClient.getBusinesses(params)
+    return { success: true, data: businesses }
+  }, [JSON.stringify(params)])
 }
 
 export function useBusiness(id: string) {
-  console.log("STUB: useBusiness hook called with id:", id)
-  console.log("CURSOR TODO: Implement single business data fetching with caching")
+  console.log("useBusiness hook called with id:", id)
 
-  return useApi(() => apiStubs.getBusinessById(id), [id])
+  return useApi(async () => {
+    const business = await apiClient.getBusinessById(id)
+    return { success: true, data: business }
+  }, [id])
 }
 
 export function useCategories() {
-  console.log("STUB: useCategories hook called")
-  console.log("CURSOR TODO: Implement categories data fetching with caching")
+  console.log("useCategories hook called")
 
-  return useApi(() => apiStubs.getCategories(), [])
+  return useApi(async () => {
+    const categories = await apiClient.getCategories()
+    return { success: true, data: categories }
+  }, [])
 }
 
 export function useReviews(businessId: string) {
   console.log("STUB: useReviews hook called with businessId:", businessId)
   console.log("CURSOR TODO: Implement reviews data fetching with pagination")
 
-  return useApi(() => apiStubs.getReviewsByBusinessId(businessId), [businessId])
+  return useApi(async () => {
+    const reviews = await apiStubs.getReviewsByBusinessId(businessId)
+    return reviews
+  }, [businessId])
 }
 
 export function useBlogPosts(params: { page?: number; limit?: number; category?: string } = {}) {
   console.log("STUB: useBlogPosts hook called with params:", params)
   console.log("CURSOR TODO: Implement blog posts data fetching with pagination and filtering")
 
-  return useApi(() => apiStubs.getBlogPosts(params), [JSON.stringify(params)])
+  return useApi(async () => {
+    const posts = await apiStubs.getBlogPosts(params)
+    return posts
+  }, [JSON.stringify(params)])
 }
 
 export function useBlogPost(slug: string) {
   console.log("STUB: useBlogPost hook called with slug:", slug)
   console.log("CURSOR TODO: Implement single blog post data fetching")
 
-  return useApi(() => apiStubs.getBlogPostBySlug(slug), [slug])
+  return useApi(async () => {
+    const post = await apiStubs.getBlogPostBySlug(slug)
+    return post
+  }, [slug])
 }
 
 // Mutation hooks for data modification
@@ -151,7 +167,10 @@ export function useAnalytics(entityType: string, entityId: string, timeRange?: s
   console.log("STUB: useAnalytics hook called:", { entityType, entityId, timeRange })
   console.log("CURSOR TODO: Implement analytics data fetching with real-time updates")
 
-  return useApi(() => apiStubs.getAnalytics(entityType, entityId, timeRange), [entityType, entityId, timeRange])
+  return useApi(async () => {
+    const analytics = await apiStubs.getAnalytics(entityType, entityId, timeRange)
+    return analytics
+  }, [entityType, entityId, timeRange])
 }
 
 // Search hook with debouncing
